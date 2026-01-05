@@ -22,7 +22,8 @@ import {
   Bed,
   Package,
   Plus,
-  Clock
+  Clock,
+  UserCheck
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import PatientList from './pages/PatientList';
@@ -40,6 +41,9 @@ import LabManagement from './pages/LabManagement';
 import RoomManagement from './pages/RoomManagement';
 import DoctorScheduleManager from './pages/DoctorScheduleManager';
 import DoctorOverrideRequest from './pages/DoctorOverrideRequest';
+import PatientProfilePage from './pages/PatientProfilePage';
+import PatientLabTests from './pages/PatientLabTests';
+import DoctorDirectory from './pages/DoctorDirectory';
 import Login from './pages/Login';
 import { db } from './utils/storage';
 import { User, UserRole } from './types';
@@ -90,6 +94,9 @@ const Navbar = ({ user }: { user: User | null }) => (
             className="w-10 h-10 rounded-full border border-slate-200 hover:border-blue-500 transition-all" 
           />
           <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all p-2 z-50">
+            <Link to="/profile" className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-600 font-semibold hover:bg-slate-50 rounded-lg transition-colors">
+              <UserCheck size={16} /> My Profile
+            </Link>
             <button 
               onClick={() => db.logout()}
               className="w-full flex items-center gap-3 px-3 py-2 text-sm text-rose-600 font-semibold hover:bg-rose-50 rounded-lg transition-colors"
@@ -103,7 +110,8 @@ const Navbar = ({ user }: { user: User | null }) => (
   </header>
 );
 
-const Layout = ({ children, user }: { children: React.ReactNode, user: User | null }) => {
+// Fix: Add optional children to Layout component to resolve TypeScript error on line 217
+const Layout = ({ children, user }: { children?: React.ReactNode, user: User | null }) => {
   const location = useLocation();
   
   return (
@@ -116,7 +124,7 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User | nu
           <span className="text-xl font-bold text-slate-900 tracking-tight">St. George</span>
         </div>
         
-        <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto pr-2 custom-scrollbar">
           <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 mt-2">Main Menu</p>
           <SidebarItem icon={LayoutDashboard} label="Dashboard" path="/" active={location.pathname === '/'} />
           
@@ -127,7 +135,11 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User | nu
           <SidebarItem icon={Calendar} label="Appointments" path="/appointments" active={location.pathname === '/appointments'} />
           
           {user?.role === UserRole.PATIENT && (
-             <SidebarItem icon={Plus} label="Book Slot" path="/book-appointment" active={location.pathname === '/book-appointment'} />
+             <>
+               <SidebarItem icon={Stethoscope} label="Find Doctors" path="/doctor-directory" active={location.pathname === '/doctor-directory'} />
+               <SidebarItem icon={Plus} label="Book Slot" path="/book-appointment" active={location.pathname === '/book-appointment'} />
+               <SidebarItem icon={FlaskConical} label="Lab Tests" path="/my-labs" active={location.pathname === '/my-labs'} />
+             </>
           )}
 
           {user?.role === UserRole.DOCTOR && (
@@ -148,7 +160,7 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User | nu
           
           <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 mt-8">Resources</p>
           <SidebarItem icon={Pill} label="Medicine Catalog" path="/medicine-catalog" active={location.pathname === '/medicine-catalog'} />
-          <SidebarItem icon={FlaskConical} label="Lab Tests" path="/lab-tests" active={location.pathname === '/lab-tests'} />
+          <SidebarItem icon={FlaskConical} label="Admin Lab Tests" path="/lab-tests" active={location.pathname === '/lab-tests'} />
           <SidebarItem icon={Bed} label="Rooms" path="/rooms" active={location.pathname === '/rooms'} />
           
           <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 mt-8">System Admin</p>
@@ -198,27 +210,41 @@ export default function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
+  // Enforce profile completion for patients
+  const isProfileIncomplete = user.role === UserRole.PATIENT && user.isProfileComplete === false;
+
   return (
     <Router>
       <Layout user={user}>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/patients" element={<PatientList />} />
-          <Route path="/patients/:id" element={<PatientDetail />} />
-          <Route path="/appointments" element={<AppointmentList />} />
-          <Route path="/book-appointment" element={user.role === UserRole.PATIENT ? <PatientAppointmentForm /> : <Navigate to="/appointments" replace />} />
-          <Route path="/doctor-schedules" element={user.role === UserRole.ADMIN ? <DoctorScheduleManager /> : <Navigate to="/" replace />} />
-          <Route path="/my-availability" element={user.role === UserRole.DOCTOR ? <DoctorOverrideRequest /> : <Navigate to="/" replace />} />
-          <Route path="/records" element={<MedicalRecordsList />} />
-          <Route path="/inventory" element={<InventoryManagement />} />
-          <Route path="/billing" element={<BillingList />} />
-          <Route path="/medicine-catalog" element={<MedicineManagement />} />
-          <Route path="/lab-tests" element={<LabManagement />} />
-          <Route path="/rooms" element={<RoomManagement />} />
-          <Route path="/users" element={user.role === UserRole.ADMIN ? <UserManagement /> : <Navigate to="/" replace />} />
-          <Route path="/branches" element={user.role === UserRole.ADMIN ? <BranchManagement /> : <Navigate to="/" replace />} />
-          <Route path="/database" element={user.role === UserRole.ADMIN ? <DatabaseManager /> : <Navigate to="/" replace />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/profile" element={<PatientProfilePage />} />
+          
+          {/* If profile incomplete, redirect patients to profile page */}
+          {isProfileIncomplete ? (
+            <Route path="*" element={<Navigate to="/profile" replace />} />
+          ) : (
+            <>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/patients" element={<PatientList />} />
+              <Route path="/patients/:id" element={<PatientDetail />} />
+              <Route path="/appointments" element={<AppointmentList />} />
+              <Route path="/doctor-directory" element={<DoctorDirectory />} />
+              <Route path="/book-appointment" element={user.role === UserRole.PATIENT ? <PatientAppointmentForm /> : <Navigate to="/appointments" replace />} />
+              <Route path="/my-labs" element={user.role === UserRole.PATIENT ? <PatientLabTests /> : <Navigate to="/" replace />} />
+              <Route path="/doctor-schedules" element={user.role === UserRole.ADMIN ? <DoctorScheduleManager /> : <Navigate to="/" replace />} />
+              <Route path="/my-availability" element={user.role === UserRole.DOCTOR ? <DoctorOverrideRequest /> : <Navigate to="/" replace />} />
+              <Route path="/records" element={<MedicalRecordsList />} />
+              <Route path="/inventory" element={<InventoryManagement />} />
+              <Route path="/billing" element={<BillingList />} />
+              <Route path="/medicine-catalog" element={<MedicineManagement />} />
+              <Route path="/lab-tests" element={<LabManagement />} />
+              <Route path="/rooms" element={<RoomManagement />} />
+              <Route path="/users" element={user.role === UserRole.ADMIN ? <UserManagement /> : <Navigate to="/" replace />} />
+              <Route path="/branches" element={user.role === UserRole.ADMIN ? <BranchManagement /> : <Navigate to="/" replace />} />
+              <Route path="/database" element={user.role === UserRole.ADMIN ? <DatabaseManager /> : <Navigate to="/" replace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          )}
         </Routes>
       </Layout>
     </Router>

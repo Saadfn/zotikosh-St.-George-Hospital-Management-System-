@@ -1,5 +1,5 @@
 
-import { User, PatientProfile, DoctorProfile, Branch, Appointment, MedicalRecord, Medicine, Inventory, Bill, DoctorWeeklySchedule, DoctorScheduleOverride } from '../types';
+import { User, PatientProfile, DoctorProfile, Branch, Appointment, MedicalRecord, Medicine, Inventory, Bill, DoctorWeeklySchedule, DoctorScheduleOverride, UserRole, LabTestType, LabRequest } from '../types';
 import { mockUsers, mockPatients, mockDoctors, mockBranches, mockAppointments, mockRecords, mockInventory, mockBills } from '../mockData';
 
 const KEYS = {
@@ -16,8 +16,10 @@ const KEYS = {
   DOCTOR_SCHEDULES: 'aura_dr_schedules',
   DOCTOR_OVERRIDES: 'aura_dr_overrides',
   LAB_TEST_TYPES: 'aura_lab_tests',
+  LAB_REQUESTS: 'aura_lab_requests',
   ROOMS: 'aura_rooms',
-  SESSION: 'aura_session'
+  SESSION: 'aura_session',
+  OTP_STORE: 'aura_otp_temp'
 };
 
 export const db = {
@@ -35,7 +37,11 @@ export const db = {
       localStorage.setItem(KEYS.MEDICINES, JSON.stringify([]));
       localStorage.setItem(KEYS.DOCTOR_SCHEDULES, JSON.stringify([]));
       localStorage.setItem(KEYS.DOCTOR_OVERRIDES, JSON.stringify([]));
-      localStorage.setItem(KEYS.LAB_TEST_TYPES, JSON.stringify([]));
+      localStorage.setItem(KEYS.LAB_TEST_TYPES, JSON.stringify([
+        { id: 'lt1', name: 'Complete Blood Count', code: 'CBC', category: 'Hematology', price: 45, turnaroundTime: '24h', description: 'Checks overall health', isActive: true },
+        { id: 'lt2', name: 'Lipid Profile', code: 'LPD', category: 'Biochemistry', price: 65, turnaroundTime: '48h', description: 'Cholesterol levels', isActive: true }
+      ]));
+      localStorage.setItem(KEYS.LAB_REQUESTS, JSON.stringify([]));
       localStorage.setItem(KEYS.ROOMS, JSON.stringify([]));
     }
   },
@@ -59,9 +65,51 @@ export const db = {
     return updatedTable;
   },
 
+  // Auth Operations
+  registerPatient: (email: string) => {
+    // Fixed dummy OTP for testing as requested
+    const otp = "001122";
+    localStorage.setItem(KEYS.OTP_STORE, JSON.stringify({ email, otp, expires: Date.now() + 600000 }));
+    
+    // Relay via requested email address
+    console.log(`[ST. GEORGE HMS RELAY] Sending OTP ${otp} to ${email} via dark7stars@gmail.com`);
+    return true;
+  },
+
+  verifyOTP: (email: string, otp: string): User | null => {
+    const stored = localStorage.getItem(KEYS.OTP_STORE);
+    if (!stored) return null;
+    const { email: sEmail, otp: sOtp, expires } = JSON.parse(stored);
+    
+    if (sEmail === email && sOtp === otp && Date.now() < expires) {
+      const users = db.getTable<User>(KEYS.USERS);
+      const existing = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      
+      if (existing) {
+        localStorage.setItem(KEYS.SESSION, JSON.stringify(existing));
+        return existing;
+      } else {
+        const newUser: User = {
+          id: `u_${Date.now()}`,
+          email,
+          name: email.split('@')[0], // Placeholder name until profile completion
+          role: UserRole.PATIENT,
+          phone: '',
+          isActive: true,
+          isProfileComplete: false
+        };
+        db.saveToTable(KEYS.USERS, newUser);
+        localStorage.setItem(KEYS.SESSION, JSON.stringify(newUser));
+        return newUser;
+      }
+    }
+    return null;
+  },
+
   login: (email: string, password: string): User | null => {
     const users = db.getTable<User>(KEYS.USERS);
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    // In this simplified version, password is always 123
     if (user && password === "123") {
       localStorage.setItem(KEYS.SESSION, JSON.stringify(user));
       return user;
