@@ -13,6 +13,14 @@ export enum AppointmentStatus {
   CANCELLED = 'CANCELLED'
 }
 
+export enum LabRequestStatus {
+  PENDING = 'PENDING',
+  COLLECTED = 'COLLECTED',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED'
+}
+
 export enum PaymentStatus {
   UNPAID = 'UNPAID',
   PARTIAL = 'PARTIAL',
@@ -32,6 +40,7 @@ export interface User {
   role: UserRole;
   phone: string;
   isActive: boolean;
+  isProfileComplete?: boolean;
 }
 
 export interface Branch {
@@ -115,6 +124,29 @@ export interface Appointment {
   doctor?: DoctorProfile;
 }
 
+export interface LabTestType {
+  id: string;
+  name: string;
+  code: string;
+  category: string;
+  price: number;
+  turnaroundTime: string;
+  description: string;
+  isActive: boolean;
+}
+
+export interface LabRequest {
+  id: string;
+  requestNo: string;
+  patientId: string;
+  testTypeId: string;
+  branchId: string;
+  status: LabRequestStatus;
+  requestedAt: string;
+  notes?: string;
+  testType?: LabTestType;
+}
+
 export interface MedicalRecord {
   id: string;
   recordNo: string;
@@ -161,17 +193,6 @@ export interface Bill {
   paymentStatus: PaymentStatus;
   createdAt: string;
   patient?: PatientProfile;
-}
-
-export interface LabTestType {
-  id: string;
-  name: string;
-  code: string;
-  category: string;
-  price: number;
-  turnaroundTime: string;
-  description: string;
-  isActive: boolean;
 }
 
 export interface Room {
